@@ -1,0 +1,21 @@
+# Python / PySpark
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.ipynb_checkpoints/
+
+# Power BI
+*.pbix.auto
+*.tmp
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Datos temporales o pesados de logs
+*.log
+06_data/temp/
