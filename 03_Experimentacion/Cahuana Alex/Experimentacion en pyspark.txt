@@ -1,0 +1,88 @@
+1.- Se hizo la experimentación con el notebook de la primera experimentación
+
+2.-
+import time
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, IntegerType, DateType, DoubleType
+
+spark.sql("USE CATALOG workspace")
+spark.sql("USE SCHEMA datostottusbd")
+
+ruta_sedes = "/Volumes/workspace/datostottusbd/sedetottus/Sede_Tottus.csv"
+ruta_stream = "/Volumes/workspace/datostottusbd/sedetottus/exp3_stream_100k_10rafagas"
+
+# Limpiar carpeta temporal y tabla previa si existen
+dbutils.fs.rm(ruta_stream, True)
+dbutils.fs.mkdirs(ruta_stream)
+spark.sql("DROP TABLE IF EXISTS alertas_tiempo_real_100k")
+
+df_sede = spark.read.option("header", True).option("inferSchema", True).csv(ruta_sedes)
+
+# 1. Generar las 10 ráfagas de eventos JSON (10,000 eventos por ráfaga = 100,000 total)
+NUM_RAFAGAS = 10
+EVENTOS_POR_RAFAGA = 20000
+
+for rafaga in range(1, NUM_RAFAGAS + 1):
+    inicio_id = (rafaga - 1) * EVENTOS_POR_RAFAGA + 1
+    fin_id = rafaga * EVENTOS_POR_RAFAGA + 1
+    
+    df_batch = spark.range(inicio_id, fin_id).withColumnRenamed("id", "id_lote") \
+        .withColumn("id_sede", ((F.col("id_lote") - 1) % 20) + 1) \
+        .withColumn("fecha_lectura", F.to_date(F.lit("2026-07-15"))) \
+        .withColumn("fecha_vencimiento", F.date_add(F.col("fecha_lectura"), (((F.col("id_lote") - 1) % 5) + 1).cast("int"))) \
+        .withColumn("cantidad_disponible", F.round(F.lit(10.00) + ((F.col("id_lote") - 1) % 30), 2))
+    
+    df_batch.write.mode("overwrite").json(f"{ruta_stream}/rafaga_{rafaga}")
+
+# Esquema explícito para lectura streaming
+esquema_eventos = StructType([
+    StructField("id_lote", IntegerType(), True),
+    StructField("id_sede", IntegerType(), True),
+    StructField("fecha_lectura", DateType(), True),
+    StructField("fecha_vencimiento", DateType(), True),
+    StructField("cantidad_disponible", DoubleType(), True)
+])
+
+# 2. Medir ejecución del pipeline Structured Streaming 
+t0 = time.perf_counter()
+
+stream_lecturas = spark.readStream \
+    .schema(esquema_eventos) \
+    .json(f"{ruta_stream}/rafaga_*")
+
+alertas_stream = stream_lecturas \
+    .join(df_sede, "id_sede") \
+    .withColumn("dias_restantes", F.datediff(F.col("fecha_vencimiento"), F.col("fecha_lectura"))) \
+    .withColumn("nivel_alerta",
+        F.when(F.col("dias_restantes") <= 2, "CRÍTICO (<=48h)")
+         .when(F.col("dias_restantes") == 3, "PREVENTIVO (72h)")
+         .otherwise("NORMAL (>72h)")
+    ) \
+    .groupBy("nombre_sede", "nivel_alerta") \
+    .agg(
+        F.count("*").alias("lotes_detectados"),
+        F.round(F.sum("cantidad_disponible"), 2).alias("unidades_en_riesgo")
+    )
+
+query = alertas_stream.writeStream \
+    .outputMode("complete") \
+    .format("delta") \
+    .option("checkpointLocation", f"{ruta_stream}/_checkpoint") \
+    .trigger(availableNow=True) \
+    .toTable("alertas_tiempo_real_100k")
+
+query.awaitTermination()
+
+latencia_ms = (time.perf_counter() - t0) * 1000
+latencia_seg = latencia_ms / 1000.0
+throughput = (NUM_RAFAGAS * EVENTOS_POR_RAFAGA) / latencia_seg
+
+print("=" * 72)
+print(f"EXPERIMENTO 3: PYSPARK STRUCTURED STREAMING ({NUM_RAFAGAS} RÁFAGAS = {NUM_RAFAGAS * EVENTOS_POR_RAFAGA:,} EVENTOS)")
+print(f"Latencia Total:  {latencia_ms:.2f} ms ({latencia_seg:.3f} s)")
+print(f"Throughput:      {throughput:,.2f} eventos/segundo")
+print(f"Evaluación SLA:  {'CUMPLE SLA (<3.0s)' if latencia_seg < 3.0 else 'EXCEDE SLA (>3.0s)'}")
+print("=" * 72)
+
+# Mostrar Top 10 alertas generadas
+display(spark.table("alertas_tiempo_real_100k").orderBy(F.desc("unidades_en_riesgo")).limit(10))
