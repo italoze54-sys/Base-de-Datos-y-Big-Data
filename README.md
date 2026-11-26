@@ -26,10 +26,8 @@ Este repositorio contiene la solución analítica integrada de **Inteligencia de
 ```text
 ├── 01_database/            # Scripts DDL para la BD OLTP (TOTTUSMERMA) y Data Mart(DM_Tottus_Merma)
 ├── 02_etl/                 # Scripts T-SQL de Extracción, Transformación, Limpieza y Carga
-├── 03_big_data/            # Scripts Python y PySpark para procesamiento distribuido
-├── 04_bi_dashboard/        # Archivo .pbix de Power BI Desktop y capturas del dashboard
-├── 05_experimentation/     # Notebooks y logs de experimentos comparativos (EXP-01, EXP-02, EXP-03)
-├── 06_data/                # Datasets original (semilla) y procesado en Parquet/CSV
+├── 03_experimentacion/     # Notebooks y logs de experimentos comparativos (EXP-01, EXP-02, EXP-03) y scripts Python y PySpark para procesamiento distribuido
+├── 04_PowerBi/             # Archivo .pbix de Power BI Desktop y capturas del dashboard
 ├── .gitignore              # Configuración de exclusión de archivos temporales
 ├── LICENSE                 # Licencia de uso MIT
 └── README.md               # Documentación principal del proyecto
@@ -62,22 +60,13 @@ Para ejecutar la extracción, limpieza de datos y carga transaccional en el Data
 
 Bash
 02_etl/ETL_CARGA_TOTTUS.sql
-3. Entorno Big Data (PySpark)
-Asegurarse de tener instalado Python 3.11+ y Java JDK 11+.
 
-Instalar las dependencias requeridas:
-
-Bash
-pip install -r 03_big_data/requirements.txt
-Ejecutar el script de generación de datos masivos y procesamiento:
-
-Bash
-python 03_big_data/generate_big_data.py
-python 03_big_data/Spark_Streaming_Ingest.py
-4. Visualización del Dashboard en Power BI
-Abrir el archivo 04_bi_dashboard/Dashboard_Tottus_Merma.pbix en Power BI Desktop.
+3. Visualización del Dashboard en Power BI
+Abrir el archivo 04_Powerbi/Proyecto.pbix en Power BI Desktop.
 
 Actualizar el origen de datos hacia la instancia local de SQL Server (DM_Tottus_Merma).
 
+4. Detalles y experimentación en DataBricks con PySpark
+Abrir el archivo 03_Experimentacion y elegir la experimentacion de cada estudiante
 📊 Paquete Experimental
 Los notebooks de ejecución y métricas comparativas entre SQL Server (T-SQL) y PySpark se encuentran documentados en la carpeta 05_experimentation/Experimentation_Spark.ipynb.
