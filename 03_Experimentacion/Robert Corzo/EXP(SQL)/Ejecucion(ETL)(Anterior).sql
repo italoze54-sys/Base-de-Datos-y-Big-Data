@@ -1,0 +1,6 @@
+USE DM_Tottus_Merma;
+GO
+
+SET STATISTICS TIME ON;
+EXEC dbo.sp_Ejecutar_ETL_Tottus;
+SET STATISTICS TIME OFF;
